@@ -8,6 +8,7 @@ This repository implements the authoritative event replay state, deterministic s
 python -m pip install -e '.[dev]'
 python -m pytest -q
 python -m nke_experiment.data --scenarios 100 --output data/generated
+python -m nke_experiment.diagnose --data data/generated --split test
 ```
 
 Each scenario stays in one split across all event steps. The manifest marks the labels synthetic. The reference oracle deliberately makes these toy tasks solvable with explicit code, so these numbers cannot establish enterprise intelligence.
@@ -21,7 +22,7 @@ python -m nke_experiment.train --data data/generated --output checkpoints/varian
 python -m nke_experiment.evaluate --checkpoint checkpoints/variant-a --data data/generated --split test
 ```
 
-The trainer fine-tunes only NKE projection, attention, and Choice scoring heads over a frozen licensed pretrained encoder. A saved `nke_heads.safetensors` is an actual trained head checkpoint if and only if training completed. The backbone is a separate required dependency and must be pinned to its revision for a reproducible release. Training accuracy on these synthetic tasks is not evidence of transfer. The CLI prints only validation accuracy; calibration and untouched final-test evaluation must be implemented before a model release.
+The trainer selects complete scenarios across all task families, then fine-tunes only NKE projection, attention, and Choice scoring heads over a frozen licensed pretrained encoder. Earlier runs with `--limit` selected the first rows from a file ordered by family. At the documented 500-row limit, priority cases were excluded and validation coverage was biased. Re-run training before interpreting those results. A saved `nke_heads.safetensors` is an actual trained head checkpoint if and only if training completed. The backbone is a separate required dependency and must be pinned to its revision for a reproducible release. Training accuracy on these synthetic tasks is not evidence of transfer. Validation accuracy is reported by family. Compare a saved checkpoint on the untouched test split with `python -m nke_experiment.diagnose --data data/generated --checkpoint checkpoints/variant-a --split test`. The CLI reports majority baselines learned from the training split, model accuracy by family and step, and sample errors. These diagnostics do not establish transfer or calibration.
 
 The next implementation slice adds cached record embeddings (Variant B) and a learned memory updater (Variant C) under the [architecture spec](NKE_Architecture_and_Experiment_Spec_v0.1.md). Choice-only training is deliberate; Binary and ordered Score need their own supervised examples and validation.
 

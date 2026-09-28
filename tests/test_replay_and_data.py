@@ -3,6 +3,8 @@ from pathlib import Path
 import pytest
 
 from nke_experiment.data import FAMILIES, assigned_split, oracle, trajectory, write_dataset
+from nke_experiment.diagnose import report
+from nke_experiment.sampling import balanced_rows
 from nke_experiment.state import Event, StateError, StateStore
 
 
@@ -55,3 +57,21 @@ def test_dataset_outputs_disjoint_scenarios(tmp_path: Path):
                 assert key not in seen
                 seen.add(key)
     assert len(seen) == 120
+
+
+def test_training_selection_balances_families_and_keeps_scenarios_intact():
+    rows = [row for family in FAMILIES for scenario in range(20) for row in trajectory(family, scenario)]
+    selected = balanced_rows(rows, 150)
+    assert len(selected) == 150
+    assert {family: sum(row["family"] == family for row in selected) for family in FAMILIES} == {
+        family: 50 for family in FAMILIES}
+    assert all(sum(row["family"] == family and row["scenario_id"] == scenario for row in selected) == 5
+               for family in FAMILIES for scenario in range(10))
+
+
+def test_baseline_uses_training_labels_only():
+    train = [{"family": "access", "label": "deny"}] * 3 + [{"family": "access", "label": "allow"}]
+    held_out = [{"family": "access", "label": "allow"}] * 4
+    result = report(train, held_out)
+    assert result["access"]["train_majority_label"] == "deny"
+    assert result["access"]["majority_accuracy"] == 0.0
