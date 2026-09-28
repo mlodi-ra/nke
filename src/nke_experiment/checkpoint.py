@@ -12,7 +12,10 @@ from .model import SnapshotDecisionModel
 
 def load_checkpoint(directory: Path) -> SnapshotDecisionModel:
     config = json.loads((directory / "config.json").read_text(encoding="utf-8"))
-    model = SnapshotDecisionModel(config["backbone"])
+    architecture = config.get("architecture", "snapshot-v1")
+    if architecture not in {"snapshot-v1", "snapshot-typed-v2"}:
+        raise ValueError(f"unknown checkpoint architecture: {architecture}")
+    model = SnapshotDecisionModel(config["backbone"], typed_features=architecture == "snapshot-typed-v2")
     weights = load_file(str(directory / "nke_heads.safetensors"))
     missing, unexpected = model.load_state_dict(weights, strict=False)
     if unexpected or any(not key.startswith("encoder.") for key in missing):

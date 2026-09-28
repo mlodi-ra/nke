@@ -3,7 +3,10 @@ from pathlib import Path
 import pytest
 
 from nke_experiment.data import FAMILIES, assigned_split, oracle, trajectory, write_dataset
+from nke_experiment.choices import candidate_names
 from nke_experiment.diagnose import report
+from nke_experiment.numeric import numeric_fields
+from nke_experiment.holdout import write_holdout
 from nke_experiment.sampling import balanced_rows
 from nke_experiment.state import Event, StateError, StateStore
 
@@ -39,6 +42,8 @@ def test_trajectories_have_oracle_labels_and_scenario_split():
             for row in rows:
                 assert row["label"] == oracle(family, row["state"]["records"], row["candidates"])
                 assert row["label"] in row["candidates"] or row["label"] is None
+                assert row["allow_none"] == (family == "resource")
+                assert ("none" in candidate_names(row)) == row["allow_none"]
                 assert StateStore.replay([Event(**event) for event in row["events"]]).snapshot() == row["state"]
             assert rows == trajectory(family, scenario_id)
 
@@ -75,3 +80,21 @@ def test_baseline_uses_training_labels_only():
     result = report(train, held_out)
     assert result["access"]["train_majority_label"] == "deny"
     assert result["access"]["majority_accuracy"] == 0.0
+
+
+def test_numeric_channel_preserves_values_and_stable_keys():
+    first = numeric_fields({"severity": 2, "active": True, "name": "a"})
+    second = numeric_fields({"name": "b", "severity": 5, "active": False})
+    assert first == [(second[0][0], 2.0)]
+    assert second[0][1] == 5.0
+    with pytest.raises(ValueError, match="non-finite"):
+        numeric_fields({"severity": float("nan")})
+
+
+def test_final_holdout_uses_separate_scenario_ids(tmp_path: Path):
+    import json
+    write_holdout(tmp_path, start_id=10000, scenarios=2)
+    rows = [json.loads(line) for line in (tmp_path / "test.jsonl").read_text().splitlines()]
+    assert len(rows) == 30
+    assert {row["scenario_id"] for row in rows} == {10000, 10001}
+    assert {row["split"] for row in rows} == {"test"}

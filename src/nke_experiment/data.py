@@ -89,7 +89,7 @@ def trajectory(family: str, scenario_id: int) -> list[dict[str, Any]]:
         rows.append({"family": family, "scenario_id": scenario_id, "step": step,
                      "split": assigned_split(family, scenario_id), "state": snapshot,
                      "events": [asdict(event) for event in events],
-                     "question": question, "candidates": candidates,
+                     "question": question, "candidates": candidates, "allow_none": family == "resource",
                      "label": oracle(family, state.records, candidates)})
         if step < len(updates):
             update = updates[step]
@@ -116,7 +116,7 @@ def write_dataset(path: Path, scenarios_per_family: int) -> dict[str, int]:
     finally:
         for handle in handles.values():
             handle.close()
-    (path / "manifest.json").write_text(json.dumps({"generator": "nke-v2", "scenarios_per_family": scenarios_per_family,
+    (path / "manifest.json").write_text(json.dumps({"generator": "nke-v3", "scenarios_per_family": scenarios_per_family,
                                                     "families": FAMILIES, "rows": counts,
                                                     "warning": "Synthetic oracle labels are not field accuracy"}, indent=2) + "\n")
     return counts

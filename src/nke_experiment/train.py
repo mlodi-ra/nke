@@ -12,6 +12,7 @@ import torch
 from safetensors.torch import save_file
 
 from .model import SnapshotDecisionModel
+from .choices import candidate_names
 from .sampling import balanced_rows
 
 
@@ -43,7 +44,7 @@ def main() -> None:
     args = parser.parse_args()
     torch.manual_seed(17)
     rows = balanced_rows(read_rows(args.data / "train.jsonl"), args.limit)
-    validation = balanced_rows(read_rows(args.data / "validation.jsonl"), max(15, args.limit // 5))
+    validation = read_rows(args.data / "validation.jsonl")
     if not rows or not validation or args.epochs < 1:
         raise ValueError("training and validation rows and positive epochs required")
     if {row["family"] for row in rows} != {row["family"] for row in validation}:
@@ -57,7 +58,7 @@ def main() -> None:
         model.train()
         total = 0.0
         for row in rows:
-            choices = list(row["candidates"]) + ["none"]
+            choices = candidate_names(row)
             target = torch.tensor([choices.index(row["label"] or "none")], dtype=torch.long)
             optimizer.zero_grad(set_to_none=True)
             loss = torch.nn.functional.cross_entropy(model(row).unsqueeze(0), target)
@@ -66,15 +67,18 @@ def main() -> None:
             total += float(loss.detach())
         accuracies = evaluate(model, validation)
         print(json.dumps({"epoch": epoch + 1, "train_loss": total / len(rows), "validation_accuracy": accuracies}))
-        if accuracies["overall"] > best:
-            best = accuracies["overall"]
+        macro = sum(accuracies[family] for family in sorted({row["family"] for row in validation})) / len({row["family"] for row in validation})
+        if macro > best:
+            best = macro
             # Save trainable heads only; backbone and revision remain an external dependency.
             weights = {k: v.detach().cpu().contiguous() for k, v in model.state_dict().items()
                        if not k.startswith("encoder.")}
             save_file(weights, str(args.output / "nke_heads.safetensors"))
             (args.output / "config.json").write_text(json.dumps({"backbone": args.backbone,
+                 "architecture": "snapshot-typed-v2",
                  "seed": 17, "train_rows_used": len(rows), "validation_rows_used": len(validation),
                  "epochs_completed": epoch + 1, "validation_accuracy": accuracies,
+                 "validation_macro_accuracy": macro,
                  "sampling": "balanced complete scenarios across families; deterministic scenario IDs",
                  "limitations": "Synthetic Choice-only model; not calibrated; no field accuracy claim"}, indent=2) + "\n")
     print("Saved trained head weights and configuration to", args.output)

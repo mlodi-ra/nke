@@ -54,6 +54,7 @@ def report(train: list[dict], held_out: list[dict], model=None, max_errors: int 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Compare held-out results to train-split majority baselines")
     parser.add_argument("--data", type=Path, required=True)
+    parser.add_argument("--held-out-data", type=Path, help="optional separate directory with the final test.jsonl")
     parser.add_argument("--split", choices=("validation", "calibration", "test"), default="test")
     parser.add_argument("--checkpoint", type=Path, help="optional trained head checkpoint")
     args = parser.parse_args()
@@ -61,7 +62,8 @@ def main() -> None:
     if args.checkpoint:
         from .checkpoint import load_checkpoint
         model = load_checkpoint(args.checkpoint)
-    result = report(read_rows(args.data / "train.jsonl"), read_rows(args.data / f"{args.split}.jsonl"), model)
+    held_out = args.held_out_data or args.data
+    result = report(read_rows(args.data / "train.jsonl"), read_rows(held_out / f"{args.split}.jsonl"), model)
     print(json.dumps({"split": args.split, "synthetic_oracle_labels": True, "by_family": result}, indent=2))
 
 
