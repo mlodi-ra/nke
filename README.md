@@ -2,6 +2,8 @@
 
 This repository implements the authoritative event replay state, deterministic synthetic trajectories with exact oracle labels, and a **trainable full-snapshot neural Choice model**. It is research code, not a trained NKE release. The optional model needs PyTorch, Transformers, and an accessible ModernBERT checkpoint.
 
+See [NKE Project Status and Roadmap](NKE_PROJECT_STATUS_AND_ROADMAP.md) for completed work, experimental results, known limitations and gated next steps.
+
 ## Run without a GPU or model download
 
 ```bash
